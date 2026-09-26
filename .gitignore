@@ -1,0 +1,15 @@
+# API キー
+.env
+.env.*
+
+# 元資料（要旨集・中間発表の PDF）はリポジトリに含めない
+*.pdf
+卒研要旨集fujimura*/
+
+# 要旨集 PDF から抽出した本文（元資料と同等の内容のため除外）
+similarity-map/cache/works_raw.json
+
+# OS / Python
+.DS_Store
+__pycache__/
+*.pyc

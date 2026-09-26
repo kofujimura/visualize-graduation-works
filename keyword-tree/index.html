@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>卒研キーワードツリー</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="tree.js"></script>
+<style>
+  :root {
+    --bg: #f6f5f2; --surface: #ffffff; --text: #1f2328; --muted: #667085;
+    --line: #d0d5dd; --edge: #b8bfca; --accent: #1d4ed8; --halo: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111315; --surface: #1a1d21; --text: #e6e8eb; --muted: #98a2b3;
+      --line: #344054; --edge: #4b5565; --accent: #7aa2ff; --halo: #1a1d21;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111315; --surface: #1a1d21; --text: #e6e8eb; --muted: #98a2b3;
+    --line: #344054; --edge: #4b5565; --accent: #7aa2ff; --halo: #1a1d21;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 20px 24px 12px; }
+  header h1 { font-size: 20px; font-weight: 700; }
+  header p { font-size: 13px; color: var(--muted); margin-top: 4px; line-height: 1.6; }
+  .controls { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; padding: 0 24px 12px; font-size: 13px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; background: var(--surface); color: var(--text); padding: 6px 12px; font: inherit; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+  .key { display: flex; gap: 14px; align-items: center; color: var(--muted); font-size: 12px; }
+  .key svg { vertical-align: middle; margin-right: 4px; }
+  input[type="search"] { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); width: 200px; }
+  main { display: flex; gap: 16px; padding: 0 24px 24px; }
+  #view {
+    flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    height: calc(100vh - 150px); min-height: 520px; overflow: hidden; position: relative;
+  }
+  #view svg { width: 100%; height: 100%; display: block; cursor: grab; }
+  aside {
+    width: 340px; flex-shrink: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px; height: calc(100vh - 150px); min-height: 520px; overflow-y: auto;
+  }
+  aside .crumb { font-size: 12px; color: var(--muted); line-height: 1.7; }
+  aside h2 { font-size: 18px; margin: 4px 0 2px; }
+  aside .meta { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+  aside h3 { font-size: 13px; margin: 16px 0 6px; color: var(--muted); font-weight: 600; }
+  aside ul { list-style: none; }
+  aside li { font-size: 13px; padding: 7px 0; border-top: 1px solid var(--line); line-height: 1.5; }
+  aside li small { color: var(--muted); }
+  aside .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  aside .chips button {
+    font: inherit; font-size: 12px; padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px;
+    background: var(--surface); color: var(--text); cursor: pointer;
+  }
+  aside .chips button:hover { border-color: var(--accent); color: var(--accent); }
+  aside button.work {
+    border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; padding: 0;
+  }
+  aside button.work:hover { color: var(--accent); text-decoration: underline; }
+  aside p.summary { font-size: 13px; line-height: 1.8; margin-top: 8px; }
+  aside details { font-size: 13px; border-top: 1px solid var(--line); padding: 6px 0; }
+  aside details summary { cursor: pointer; padding: 2px 0; }
+  aside details li:first-child { border-top: 0; }
+  .hint { font-size: 12px; color: var(--muted); line-height: 1.7; }
+  .stats { font-size: 13px; line-height: 1.9; }
+  .links path { fill: none; stroke: var(--edge); stroke-width: 1.2; }
+  .nodes text {
+    font-size: 12px; fill: var(--text); paint-order: stroke; stroke: var(--halo); stroke-width: 3px;
+    stroke-linejoin: round; cursor: pointer;
+  }
+  .nodes .depth-1 text { font-size: 14px; font-weight: 700; }
+  .nodes .depth-2 text { font-weight: 600; }
+  .nodes .added text { font-style: normal; }
+  .nodes .shape { cursor: pointer; stroke-width: 1.5px; }
+  .nodes .sel .shape { stroke: var(--accent); stroke-width: 3px; }
+  .nodes .sel text { fill: var(--accent); }
+  .nodes .hit text { fill: var(--accent); font-weight: 700; }
+  .dim { opacity: .18; }
+  @media (max-width: 860px) {
+    main { flex-direction: column; padding: 0 16px 16px; }
+    header, .controls { padding-left: 16px; padding-right: 16px; }
+    #view { height: 70vh; }
+    aside { width: 100%; height: auto; min-height: 0; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>藤村ゼミ 卒業研究 キーワードツリー 2020–2026</h1>
+  <p id="sub"></p>
+</header>
+
+<div class="controls">
+  <div class="seg" role="group" aria-label="レイアウト">
+    <button data-layout="tidy" aria-pressed="true">横型ツリー</button>
+    <button data-layout="radial" aria-pressed="false">放射状ツリー</button>
+  </div>
+  <div class="key">
+    <span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#888"/></svg>キーワード（大きさ＝下位の語を含めた研究数）</span>
+    <span><svg width="14" height="14"><rect x="2" y="2" width="10" height="10" fill="none" stroke="#888" stroke-width="1.5"/></svg>補助的に追加した上位概念</span>
+  </div>
+  <input type="search" id="search" placeholder="キーワードを検索">
+</div>
+
+<main>
+  <div id="view"><svg></svg></div>
+  <aside id="panel"></aside>
+</main>
+
+<script>
+const T = window.TREE;
+
+// ---- 階層データ ----
+const rows = [{ name: T.root, parent: null, added: true, works: [] }, ...T.nodes];
+const root = d3.stratify().id(d => d.name).parentId(d => d.parent)(rows);
+// 同じ親の中では、配下の研究数が多い枝を上に
+// 上位の語は下位の語の研究も含む（たどって絞り込むナビゲーションのため）。
+// all = 下位を含めた研究、via = 下位の語から引き継いだ研究 → 経由した語
+root.eachAfter(d => {
+  d.all = new Set(d.data.works);
+  d.via = new Map();
+  (d.children || []).forEach(c => c.all.forEach(id => {
+    d.all.add(id);
+    if (!d.data.works.includes(id)) {
+      const from = c.data.works.includes(id) ? [c.id] : c.via.get(id);
+      d.via.set(id, [...new Set([...(d.via.get(id) || []), ...from])]);
+    }
+  }));
+});
+// 同じ親の中では、配下の研究が多い枝を上に
+root.sort((a, b) => b.all.size - a.all.size || a.id.localeCompare(b.id, "ja"));
+
+const branchColor = d3.scaleOrdinal()
+  .domain(root.children.map(c => c.id))
+  .range(["#4e79a7", "#f28e2b", "#59a14f", "#e15759", "#b07aa1", "#76b7b2", "#9c755f", "#edc948"]);
+const colorOf = d => d.depth === 0 ? "#888" : branchColor(d.ancestors().at(-2).id);
+const size = d3.scaleSqrt().domain([0, d3.max(root.descendants().slice(1), d => d.all.size)]).range([2.5, 11]);
+
+const keywordCount = T.nodes.filter(d => !d.added).length;
+document.getElementById("sub").textContent =
+  `${Object.keys(T.works).length}件の卒研に3〜5個ずつキーワードを付け（計${keywordCount}語）、`
+  + `概念の抽象度にもとづいて上位 → 下位の木に並べました。キーワード付与と階層化は gpt-5.5 によるものです。`;
+
+// ---- 描画 ----
+const svg = d3.select("#view svg");
+const g = svg.append("g");
+const linkG = g.append("g").attr("class", "links");
+const nodeG = g.append("g").attr("class", "nodes");
+const zoom = d3.zoom().scaleExtent([0.2, 3]).on("zoom", e => g.attr("transform", e.transform));
+svg.call(zoom).on("dblclick.zoom", null);
+svg.on("click", e => { if (e.target === svg.node()) select(null); });
+
+let layout = "tidy";
+let selected = null;
+
+function draw() {
+  let pos, linkPath;
+  if (layout === "tidy") {
+    d3.tree().nodeSize([22, 190])(root);
+    pos = d => [d.y, d.x];
+    linkPath = d3.linkHorizontal().x(d => d.y).y(d => d.x);
+  } else {
+    const R = 150 * root.height;
+    d3.tree().size([2 * Math.PI, R]).separation((a, b) => (a.parent === b.parent ? 1 : 2) / a.depth)(root);
+    pos = d => d3.pointRadial(d.x, d.y);
+    linkPath = d3.linkRadial().angle(d => d.x).radius(d => d.y);
+  }
+
+  linkG.selectAll("path").data(root.links()).join("path").attr("d", linkPath);
+
+  const node = nodeG.selectAll("g.n").data(root.descendants(), d => d.id).join(enter => {
+    const e = enter.append("g").attr("class", d => `n depth-${d.depth}`).classed("added", d => d.data.added);
+    e.each(function (d) {
+      const s = d3.select(this);
+      if (d.data.added) {
+        s.append("rect").attr("class", "shape").attr("x", -5).attr("y", -5).attr("width", 10).attr("height", 10)
+          .attr("fill", "var(--surface)").attr("stroke", colorOf(d));
+      } else {
+        s.append("circle").attr("class", "shape").attr("r", size(d.all.size))
+          .attr("fill", colorOf(d)).attr("stroke", "var(--surface)");
+      }
+    });
+    e.append("text");
+    e.append("title");
+    e.on("click", (ev, d) => { ev.stopPropagation(); select(d); });
+    return e;
+  });
+
+  node.attr("transform", d => `translate(${pos(d)})`);
+  node.select("title").text(d => `${d.id}${d.data.added ? "（上位概念）" : ""}：${d.all.size}件`
+  + (d.via.size ? `（直接 ${d.data.works.length}件＋下位の語から ${d.via.size}件）` : ""));
+  node.select("text").text(d => d.id).each(function (d) {
+    const t = d3.select(this);
+    const leaf = !d.children;
+    if (layout === "tidy") {
+      t.attr("transform", null).attr("dy", "0.32em")
+        .attr("x", leaf ? 12 : -12).attr("text-anchor", leaf ? "start" : "end");
+    } else {
+      const deg = d.x * 180 / Math.PI - 90, flip = d.x >= Math.PI;
+      t.attr("dy", "0.32em").attr("x", flip ? -12 : 12).attr("text-anchor", flip ? "end" : "start")
+        .attr("transform", d.depth === 0 ? null : `rotate(${deg}) ${flip ? "rotate(180)" : ""}`)
+        .attr("x", d.depth === 0 ? 0 : (flip ? -12 : 12));
+      if (d.depth === 0) t.attr("text-anchor", "middle").attr("dy", "-1.2em");
+    }
+  });
+  fit();
+  applyState();
+}
+
+function fit() {
+  const b = g.node().getBBox();
+  const el = document.getElementById("view");
+  const w = el.clientWidth, h = el.clientHeight, pad = 24;
+  // 横型ツリーは縦に長いので、横幅に合わせて上端から表示する（縦はスクロール相当のパンで閲覧）
+  const k = layout === "tidy"
+    ? Math.min((w - pad * 2) / b.width, 1.1)
+    : Math.min((w - pad * 2) / b.width, (h - pad * 2) / b.height, 1.2);
+  const tx = w / 2 - (b.x + b.width / 2) * k;
+  const ty = layout === "tidy" && b.height * k > h ? pad - b.y * k : h / 2 - (b.y + b.height / 2) * k;
+  svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(k));
+}
+
+// ---- 選択・検索 ----
+// 選択はキーワード（selected）か研究（selectedWork）のどちらか一方
+let selectedWork = null;
+const nodeById = new Map(root.descendants().map(d => [d.id, d]));
+
+function applyState() {
+  const q = document.getElementById("search").value.trim();
+  const node = nodeG.selectAll("g.n");
+  let onPath = null, marked = new Set();
+  if (selected) {
+    onPath = new Set([...selected.ancestors(), ...selected.descendants()].map(d => d.id));
+    marked.add(selected.id);
+  } else if (selectedWork) {
+    // 研究に付いたキーワードと、そこから根までの経路を強調
+    const kws = T.works[selectedWork].keywords.map(k => nodeById.get(k)).filter(Boolean);
+    onPath = new Set(kws.flatMap(k => k.ancestors()).map(d => d.id));
+    kws.forEach(k => marked.add(k.id));
+  }
+  node.classed("sel", d => marked.has(d.id))
+      .classed("hit", d => !!q && d.id.includes(q))
+      .classed("dim", d => onPath && !onPath.has(d.id));
+  linkG.selectAll("path").classed("dim", l => onPath && !(onPath.has(l.source.id) && onPath.has(l.target.id)));
+}
+
+function select(d) { selected = d; selectedWork = null; applyState(); renderPanel(); }
+function selectWork(id) { selected = null; selectedWork = id; applyState(); renderPanel(); }
+
+const panel = document.getElementById("panel");
+const workItem = id => {
+  const w = T.works[id];
+  return `<li><button class="work" data-work="${id}">${w.title}</button><br><small>${w.year}年度</small></li>`;
+};
+
+function bindPanel() {
+  panel.querySelectorAll("button[data-node]").forEach(b =>
+    b.addEventListener("click", () => select(nodeById.get(b.dataset.node))));
+  panel.querySelectorAll("button[data-work]").forEach(b =>
+    b.addEventListener("click", () => selectWork(b.dataset.work)));
+}
+
+function renderPanel() {
+  if (selectedWork) {
+    const w = T.works[selectedWork];
+    panel.innerHTML = `
+      <div class="crumb">${w.year}年度${w.year === 2026 ? "（中間発表）" : ""}</div>
+      <h2>${w.title}</h2>
+      <p class="summary">${w.summary}</p>
+      <h3>キーワード（ツリー上で強調表示）</h3>
+      <div class="chips">${w.keywords.map(k => `<button data-node="${k}">${k}</button>`).join("")}</div>`;
+  } else if (!selected) {
+    const tops = root.children.map(c => `<li><span style="color:${branchColor(c.id)}">■</span> ${c.id}
+      <small>— キーワード ${c.descendants().length - 1}語 / 研究 ${c.all.size}件</small></li>`).join("");
+    const single = T.nodes.filter(d => !d.added && d.works.length === 1).length;
+    const ids = Object.keys(T.works);
+    const years = [...new Set(ids.map(id => T.works[id].year))].sort((a, b) => b - a);
+    panel.innerHTML = `
+      <h3 style="margin-top:0">大分類</h3><ul>${tops}</ul>
+      <h3>語彙の内訳</h3>
+      <p class="stats">キーワード ${keywordCount}語（うち1件の研究にしか付いていない語 ${single}語）<br>
+      補助的に追加した上位概念 ${T.nodes.filter(d => d.added).length}個<br>
+      1つ上の層へ移した語 ${T.nodes.filter(d => d.promotedFrom).length}語</p>
+      <h3>研究一覧（${ids.length}件）</h3>
+      ${years.map(y => {
+        const list = ids.filter(id => T.works[id].year === y);
+        return `<details${y === years[0] ? " open" : ""}><summary>${y}年度（${list.length}件）</summary>
+          <ul>${list.map(workItem).join("")}</ul></details>`;
+      }).join("")}
+      <h3>使い方</h3>
+      <p class="hint">キーワードをクリックすると、その語の上位・下位の枝だけを強調し、下位の語を含めた関連研究を一覧表示します。下位の語を選んで絞り込めます。
+      研究をクリックすると、タイトルと概要を表示し、その研究のキーワードをツリー上で強調します。
+      ドラッグで移動、ホイールで拡大縮小できます。</p>`;
+  } else {
+    const d = selected;
+    const crumb = d.ancestors().reverse().map(a => a.id).join(" › ");
+    const byYear = (a, b) => T.works[b].year - T.works[a].year || a.localeCompare(b);
+    const direct = d.data.works.slice().sort(byYear);
+    const inherited = [...d.via.keys()].sort(byYear);
+    const viaItem = id => {
+      const w = T.works[id];
+      return `<li><button class="work" data-work="${id}">${w.title}</button><br>
+        <small>${w.year}年度 ／ 経由：${d.via.get(id).join("・")}</small></li>`;
+    };
+    panel.innerHTML = `
+      <div class="crumb">${crumb}</div>
+      <h2>${d.id}</h2>
+      <div class="meta">関連する研究 ${d.all.size}件（直接 ${direct.length}件 ／ 下位の語から ${inherited.length}件）
+        ${d.data.added ? "<br>補助的に追加した上位概念" : ""}
+        ${d.data.promotedFrom ? `<br>「${d.data.promotedFrom}」の下から1つ上の層へ移した語` : ""}</div>
+      ${d.children ? `<h3>下位の語で絞り込む</h3><div class="chips">${d.children.map(c =>
+        `<button data-node="${c.id}">${c.id}（${c.all.size}）</button>`).join("")}</div>` : ""}
+      ${direct.length ? `<h3>この語が直接付いた研究（${direct.length}件）</h3><ul>${direct.map(workItem).join("")}</ul>` : ""}
+      ${inherited.length ? `<h3>下位の語から含まれる研究（${inherited.length}件）</h3><ul>${inherited.map(viaItem).join("")}</ul>` : ""}`;
+  }
+  bindPanel();
+}
+
+document.querySelectorAll("[data-layout]").forEach(b => b.addEventListener("click", () => {
+  layout = b.dataset.layout;
+  document.querySelectorAll("[data-layout]").forEach(x => x.setAttribute("aria-pressed", x === b));
+  draw();
+}));
+document.getElementById("search").addEventListener("input", applyState);
+window.addEventListener("resize", fit);
+
+// URL に #radial を付けると放射状ツリーで開く
+if (location.hash === "#radial") {
+  layout = "radial";
+  document.querySelectorAll("[data-layout]").forEach(x => x.setAttribute("aria-pressed", x.dataset.layout === layout));
+}
+draw();
+renderPanel();
+</script>
+</body>
+</html>

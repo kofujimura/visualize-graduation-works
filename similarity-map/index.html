@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>卒研類似度マップ</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="graph.js"></script>
+<style>
+  :root {
+    --bg: #f6f5f2;
+    --surface: #ffffff;
+    --text: #1f2328;
+    --muted: #667085;
+    --line: #d0d5dd;
+    --edge: #98a2b3;
+    --accent: #1d4ed8;
+    --halo: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111315; --surface: #1a1d21; --text: #e6e8eb; --muted: #98a2b3;
+      --line: #344054; --edge: #667085; --accent: #7aa2ff; --halo: #1a1d21;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111315; --surface: #1a1d21; --text: #e6e8eb; --muted: #98a2b3;
+    --line: #344054; --edge: #667085; --accent: #7aa2ff; --halo: #1a1d21;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh;
+  }
+  header { padding: 20px 24px 12px; }
+  header h1 { font-size: 20px; font-weight: 700; }
+  header p { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center;
+    padding: 0 24px 12px; font-size: 13px;
+  }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button {
+    border: 0; background: var(--surface); color: var(--text); padding: 6px 12px;
+    font: inherit; cursor: pointer;
+  }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+  .years { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
+    border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
+    color: var(--text); font: inherit; cursor: pointer;
+  }
+  .chip[aria-pressed="false"] { opacity: .4; }
+  .chip i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  input[type="search"] {
+    font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--surface); color: var(--text); width: 200px;
+  }
+  main { display: flex; gap: 16px; padding: 0 24px 24px; }
+  #map {
+    flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--line);
+    border-radius: 12px; height: calc(100vh - 150px); min-height: 520px; position: relative;
+  }
+  #map svg { width: 100%; height: 100%; display: block; cursor: grab; }
+  aside {
+    width: 340px; flex-shrink: 0; background: var(--surface); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px; height: calc(100vh - 150px); min-height: 520px; overflow-y: auto;
+  }
+  aside h2 { font-size: 16px; line-height: 1.5; }
+  aside .meta { font-size: 12px; color: var(--muted); margin: 6px 0 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  aside .tag { display: inline-flex; align-items: center; gap: 5px; }
+  aside .tag i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  aside p.summary { font-size: 13px; line-height: 1.8; }
+  aside h3 { font-size: 13px; margin: 18px 0 8px; color: var(--muted); font-weight: 600; }
+  aside ol { list-style: none; }
+  aside li button {
+    width: 100%; text-align: left; border: 0; background: none; color: var(--text); font: inherit;
+    font-size: 13px; padding: 7px 0; border-top: 1px solid var(--line); cursor: pointer;
+    display: grid; grid-template-columns: 1fr auto; gap: 8px;
+  }
+  aside li button:hover { color: var(--accent); }
+  aside li small { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .legend { font-size: 12px; }
+  .legend div { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+  .legend i { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .hint { font-size: 12px; color: var(--muted); line-height: 1.7; }
+  .links line { stroke: var(--edge); }
+  .nodes text {
+    font-size: 11px; fill: var(--text); paint-order: stroke; stroke: var(--halo);
+    stroke-width: 3px; stroke-linejoin: round; pointer-events: none; user-select: none;
+  }
+  .nodes circle { cursor: pointer; stroke: var(--surface); stroke-width: 1.5px; }
+  .nodes .is-new circle { stroke: var(--text); stroke-width: 2px; }
+  .nodes .is-new text { font-weight: 700; }
+  .dim { opacity: .12; }
+  .hit circle { stroke: var(--accent) !important; stroke-width: 3px !important; }
+  @media (max-width: 860px) {
+    main { flex-direction: column; padding: 0 16px 16px; }
+    header, .controls { padding-left: 16px; padding-right: 16px; }
+    #map { height: 70vh; }
+    aside { width: 100%; height: auto; min-height: 0; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>藤村ゼミ 卒業研究 類似度マップ 2020–2026</h1>
+  <p id="sub"></p>
+</header>
+
+<div class="controls">
+  <div class="seg" role="group" aria-label="色分け">
+    <button data-color="group" aria-pressed="true">テーマ別</button>
+    <button data-color="year" aria-pressed="false">年度別</button>
+  </div>
+  <div class="seg" role="group" aria-label="ラベル">
+    <button data-label="short" aria-pressed="true">短縮ラベル</button>
+    <button data-label="none" aria-pressed="false">ラベルなし</button>
+  </div>
+  <div class="years" id="years"></div>
+  <input type="search" id="search" placeholder="タイトル・概要を検索">
+</div>
+
+<main>
+  <div id="map"><svg></svg></div>
+  <aside id="panel"></aside>
+</main>
+
+<script>
+const G = window.GRAPH;
+const NEW_YEAR = 2026;
+const years = [...new Set(G.nodes.map(d => d.year))].sort();
+const byId = new Map(G.nodes.map(d => [d.id, d]));
+
+const groupColor = d3.scaleOrdinal()
+  .domain(Object.keys(G.meta.clusters).map(Number))
+  .range(["#e15759", "#4e79a7", "#59a14f", "#f28e2b", "#b07aa1", "#76b7b2", "#edc948", "#9c755f"]);
+const yearColor = d3.scaleOrdinal()
+  .domain(years)
+  .range(["#c6dbef", "#9ecae1", "#6baed6", "#4292c6", "#2171b5", "#08519c", "#e6550d"]);
+
+let colorMode = "group";
+let selected = null;
+const activeYears = new Set(years);
+
+document.getElementById("sub").textContent =
+  `${G.nodes.length}件の研究を ${G.meta.embedModel} でベクトル化し、各研究を類似度の高い上位${G.meta.topK}件と線で結んでいます。`
+  + ` 太枠の点が${NEW_YEAR}年度（中間発表）です。`;
+
+// ---- SVG / force ----
+const svg = d3.select("#map svg");
+const root = svg.append("g");
+const linkG = root.append("g").attr("class", "links");
+const nodeG = root.append("g").attr("class", "nodes");
+
+const zoom = d3.zoom().scaleExtent([0.3, 4]).on("zoom", e => root.attr("transform", e.transform));
+svg.call(zoom).on("dblclick.zoom", null);
+svg.on("click", e => { if (e.target === svg.node()) select(null); });
+
+const sims = G.links.map(l => l.value);
+const dist = d3.scaleLinear().domain(d3.extent(sims)).range([110, 35]);
+const width = () => document.getElementById("map").clientWidth;
+const height = () => document.getElementById("map").clientHeight;
+
+const link = linkG.selectAll("line").data(G.links).join("line")
+  .attr("stroke-width", d => 0.6 + (d.value - d3.min(sims)) * 8)
+  .attr("stroke-opacity", 0.5);
+
+const node = nodeG.selectAll("g").data(G.nodes).join("g")
+  .classed("is-new", d => d.year === NEW_YEAR)
+  .call(d3.drag()
+    .on("start", (e, d) => { if (!e.active) sim.alphaTarget(0.2).restart(); d.fx = d.x; d.fy = d.y; })
+    .on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; })
+    .on("end", (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; }))
+  .on("mouseenter", (e, d) => { if (!selected) highlight(d); })
+  .on("mouseleave", () => { if (!selected) highlight(null); })
+  .on("click", (e, d) => { e.stopPropagation(); select(d); });
+
+node.append("circle").attr("r", d => d.year === NEW_YEAR ? 8 : 6);
+const labels = node.append("text").attr("x", 10).attr("y", 4).text(d => d.label);
+node.append("title").text(d => `${d.year}年度\n${d.title}`);
+
+// t-SNE の座標（-1〜1）を仮想キャンバスへ。縦横比は表示領域に合わせ、表示は zoom で画面に収める
+const SPAN = 1300;
+const aspect = Math.min(Math.max(height() / width(), 0.5), 1.4);
+const [x0, x1] = d3.extent(G.nodes, d => d.px), [y0, y1] = d3.extent(G.nodes, d => d.py);
+G.nodes.forEach(d => {
+  d.tx = ((d.px - x0) / (x1 - x0) - 0.5) * SPAN;
+  d.ty = ((d.py - y0) / (y1 - y0) - 0.5) * SPAN * aspect;
+  d.x = d.tx; d.y = d.ty;
+  d.w = 16 + d.label.length * 11;  // 点＋ラベルの横幅（11px フォント想定）
+});
+
+// 点＋ラベルを長方形とみなし、重なったら縦方向を主に押し分ける
+function labelCollide() {
+  let nodes;
+  const H = 16;
+  function force(alpha) {
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i], b = nodes[j];
+        const ax = a.x - 8, bx = b.x - 8;
+        const ox = Math.min(ax + a.w, bx + b.w) - Math.max(ax, bx);
+        const oy = H - Math.abs(a.y - b.y);
+        if (ox > 0 && oy > 0) {
+          if (oy < ox) {
+            const s = (a.y < b.y ? -1 : 1) * oy * 0.5 * Math.max(alpha, 0.3);
+            a.y += s; b.y -= s;
+          } else {
+            const s = (a.x < b.x ? -1 : 1) * ox * 0.5 * Math.max(alpha, 0.3);
+            a.x += s; b.x -= s;
+          }
+        }
+      }
+    }
+  }
+  force.initialize = n => { nodes = n; };
+  return force;
+}
+
+const sim = d3.forceSimulation(G.nodes)
+  .force("link", d3.forceLink(G.links).id(d => d.id).distance(d => dist(d.value)).strength(0.03))
+  .force("x", d3.forceX(d => d.tx).strength(0.25))
+  .force("y", d3.forceY(d => d.ty).strength(0.25))
+  .force("labels", labelCollide())
+  .on("tick", ticked)
+  .on("end", fitView);
+
+function ticked() {
+  link.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+      .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+  node.attr("transform", d => `translate(${d.x},${d.y})`);
+}
+
+function fitView() {
+  const b = root.node().getBBox();
+  const w = width(), h = height(), pad = 30;
+  const k = Math.min((w - pad * 2) / b.width, (h - pad * 2) / b.height, 2);
+  svg.transition().duration(400).call(zoom.transform,
+    d3.zoomIdentity.translate(w / 2, h / 2).scale(k).translate(-(b.x + b.width / 2), -(b.y + b.height / 2)));
+}
+// 初期表示でも中央に来るよう、計算を先に進めてから描画する
+sim.tick(300);
+ticked();
+fitView();
+
+// ---- 色・表示 ----
+function colorOf(d) { return colorMode === "group" ? groupColor(d.group) : yearColor(d.year); }
+function paint() {
+  node.select("circle").attr("fill", colorOf);
+  applyVisibility();
+  renderPanel();
+}
+
+function neighborsOf(d) {
+  const s = new Set([d.id]);
+  G.links.forEach(l => {
+    if (l.source.id === d.id) s.add(l.target.id);
+    if (l.target.id === d.id) s.add(l.source.id);
+  });
+  return s;
+}
+
+let focusSet = null;
+function highlight(d) { focusSet = d ? neighborsOf(d) : null; applyVisibility(); }
+
+function applyVisibility() {
+  const q = document.getElementById("search").value.trim().toLowerCase();
+  const match = d => !q || (d.title + d.summary + d.label).toLowerCase().includes(q);
+  const visible = d => activeYears.has(d.year) && (!focusSet || focusSet.has(d.id)) && match(d);
+  node.classed("dim", d => !visible(d)).classed("hit", d => !!q && match(d) && activeYears.has(d.year));
+  link.classed("dim", l => !(visible(l.source) && visible(l.target)) ||
+    (focusSet && !(focusSet.has(l.source.id) && focusSet.has(l.target.id))));
+}
+
+function select(d) {
+  selected = d;
+  highlight(d);
+  renderPanel();
+}
+
+// ---- サイドパネル ----
+const panel = document.getElementById("panel");
+function renderPanel() {
+  if (!selected) {
+    const entries = colorMode === "group"
+      ? Object.entries(G.meta.clusters).map(([k, name]) => [groupColor(+k), name, G.nodes.filter(n => n.group === +k).length])
+      : years.map(y => [yearColor(y), `${y}年度`, G.nodes.filter(n => n.year === y).length]);
+    panel.innerHTML = `
+      <h3 style="margin-top:0">${colorMode === "group" ? "テーマ（K-meansで自動分類）" : "年度"}</h3>
+      <div class="legend">${entries.map(([c, name, n]) =>
+        `<div><i style="background:${c}"></i>${name}<small style="margin-left:auto;color:var(--muted)">${n}件</small></div>`).join("")}</div>
+      <h3>使い方</h3>
+      <p class="hint">点にマウスを重ねると、つながっている研究だけが強調されます。
+      クリックすると、正式タイトル・概要・似ている研究の上位5件をここに表示します。
+      ドラッグで点を動かし、ホイールで拡大縮小できます。</p>`;
+    return;
+  }
+  const d = selected;
+  panel.innerHTML = `
+    <h2>${d.title}</h2>
+    <div class="meta">
+      <span>${d.year}年度${d.year === NEW_YEAR ? "（中間発表）" : ""}</span>
+      <span class="tag"><i style="background:${groupColor(d.group)}"></i>${G.meta.clusters[d.group]}</span>
+    </div>
+    <p class="summary">${d.summary}</p>
+    <h3>似ている研究（コサイン類似度）</h3>
+    <ol>${d.neighbors.map(n => {
+      const m = byId.get(n.id);
+      return `<li><button data-id="${m.id}"><span>${m.title}<br><small>${m.year}年度</small></span><small>${n.sim.toFixed(3)}</small></button></li>`;
+    }).join("")}</ol>`;
+  panel.querySelectorAll("button[data-id]").forEach(b =>
+    b.addEventListener("click", () => select(byId.get(b.dataset.id))));
+}
+
+// ---- コントロール ----
+document.querySelectorAll("[data-color]").forEach(b => b.addEventListener("click", () => {
+  colorMode = b.dataset.color;
+  document.querySelectorAll("[data-color]").forEach(x => x.setAttribute("aria-pressed", x === b));
+  paint();
+}));
+document.querySelectorAll("[data-label]").forEach(b => b.addEventListener("click", () => {
+  labels.style("display", b.dataset.label === "none" ? "none" : null);
+  document.querySelectorAll("[data-label]").forEach(x => x.setAttribute("aria-pressed", x === b));
+}));
+const yearBox = document.getElementById("years");
+years.forEach(y => {
+  const b = document.createElement("button");
+  b.className = "chip";
+  b.setAttribute("aria-pressed", "true");
+  b.innerHTML = `<i style="background:${yearColor(y)}"></i>${y}`;
+  b.addEventListener("click", () => {
+    activeYears.has(y) ? activeYears.delete(y) : activeYears.add(y);
+    b.setAttribute("aria-pressed", activeYears.has(y));
+    applyVisibility();
+  });
+  yearBox.appendChild(b);
+});
+document.getElementById("search").addEventListener("input", applyVisibility);
+window.addEventListener("resize", fitView);
+
+paint();
+</script>
+</body>
+</html>

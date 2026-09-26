@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>卒研エクスプローラー</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="similarity-map/graph.js"></script>
+<script src="keyword-tree/tree.js"></script>
+<style>
+  :root {
+    --bg: #f6f5f2; --surface: #ffffff; --text: #1f2328; --muted: #667085;
+    --line: #d0d5dd; --edge: #98a2b3; --tree-edge: #b8bfca; --accent: #1d4ed8; --halo: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111315; --surface: #1a1d21; --text: #e6e8eb; --muted: #98a2b3;
+      --line: #344054; --edge: #667085; --tree-edge: #4b5565; --accent: #7aa2ff; --halo: #1a1d21;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111315; --surface: #1a1d21; --text: #e6e8eb; --muted: #98a2b3;
+    --line: #344054; --edge: #667085; --tree-edge: #4b5565; --accent: #7aa2ff; --halo: #1a1d21;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 18px 24px 10px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 20px; }
+  header h1 { font-size: 20px; font-weight: 700; }
+  header p { font-size: 13px; color: var(--muted); flex-basis: 100%; line-height: 1.6; }
+
+  .tabs { display: flex; gap: 4px; padding: 0 24px; border-bottom: 1px solid var(--line); }
+  .tabs button {
+    font: inherit; font-size: 14px; font-weight: 600; padding: 10px 16px; border: 0; background: none;
+    color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--text); }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 12px 24px; font-size: 13px; min-height: 58px; }
+  .controls [data-for] { display: contents; }
+  .controls [data-for][hidden] { display: none; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; background: var(--surface); color: var(--text); padding: 6px 12px; font: inherit; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+  .years { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--line);
+    border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; cursor: pointer;
+  }
+  .chip[aria-pressed="false"] { opacity: .4; }
+  .chip i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .key { display: flex; gap: 14px; align-items: center; color: var(--muted); font-size: 12px; }
+  .key svg { vertical-align: middle; margin-right: 4px; }
+  input[type="search"] {
+    font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--surface); color: var(--text); width: 210px; margin-left: auto;
+  }
+
+  main { display: flex; gap: 16px; padding: 0 24px 24px; }
+  #stage {
+    flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    height: calc(100vh - 190px); min-height: 520px; position: relative; overflow: hidden;
+  }
+  #stage svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; }
+  /* 非表示の側も寸法計算（getBBox）できるよう visibility で切り替える */
+  #stage svg.off { visibility: hidden; pointer-events: none; }
+
+  aside {
+    width: 350px; flex-shrink: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px; height: calc(100vh - 190px); min-height: 520px; overflow-y: auto;
+  }
+  aside .crumb { font-size: 12px; color: var(--muted); line-height: 1.7; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+  aside .tag { display: inline-flex; align-items: center; gap: 5px; }
+  aside .tag i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  aside h2 { font-size: 17px; line-height: 1.5; margin: 4px 0 2px; }
+  aside .meta { font-size: 12px; color: var(--muted); margin-bottom: 10px; line-height: 1.7; }
+  aside h3 { font-size: 13px; margin: 16px 0 6px; color: var(--muted); font-weight: 600; }
+  aside ul { list-style: none; }
+  aside li { font-size: 13px; padding: 7px 0; border-top: 1px solid var(--line); line-height: 1.5; }
+  aside li small { color: var(--muted); }
+  aside p.summary { font-size: 13px; line-height: 1.8; margin-top: 8px; }
+  aside .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  aside .chips button {
+    font: inherit; font-size: 12px; padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px;
+    background: var(--surface); color: var(--text); cursor: pointer;
+  }
+  aside .chips button:hover { border-color: var(--accent); color: var(--accent); }
+  aside button.work { border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; padding: 0; }
+  aside button.work:hover { color: var(--accent); text-decoration: underline; }
+  aside .sim-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+  aside .sim-row small { font-variant-numeric: tabular-nums; }
+  aside .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  aside .actions button {
+    font: inherit; font-size: 13px; padding: 7px 12px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--accent); background: none; color: var(--accent);
+  }
+  aside .actions button:hover { background: var(--accent); color: var(--surface); }
+  aside details { font-size: 13px; border-top: 1px solid var(--line); padding: 6px 0; }
+  aside details summary { cursor: pointer; padding: 2px 0; }
+  aside details li:first-child { border-top: 0; }
+  .legend { font-size: 12px; }
+  .legend div { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+  .legend i { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .hint, .stats { font-size: 12px; color: var(--muted); line-height: 1.8; }
+  .stats { color: var(--text); font-size: 13px; }
+
+  /* 類似度マップ */
+  #mapSvg .links line { stroke: var(--edge); }
+  #mapSvg text {
+    font-size: 11px; fill: var(--text); paint-order: stroke; stroke: var(--halo); stroke-width: 3px;
+    stroke-linejoin: round; pointer-events: none; user-select: none;
+  }
+  #mapSvg circle { cursor: pointer; stroke: var(--surface); stroke-width: 1.5px; }
+  #mapSvg .is-new circle { stroke: var(--text); stroke-width: 2px; }
+  #mapSvg .is-new text { font-weight: 700; }
+  #mapSvg .hit circle, #mapSvg .sel circle { stroke: var(--accent) !important; stroke-width: 3px !important; }
+  #mapSvg .sel text { fill: var(--accent); font-weight: 700; }
+
+  /* キーワードツリー */
+  #treeSvg .links path { fill: none; stroke: var(--tree-edge); stroke-width: 1.2; }
+  #treeSvg text {
+    font-size: 12px; fill: var(--text); paint-order: stroke; stroke: var(--halo); stroke-width: 3px;
+    stroke-linejoin: round; cursor: pointer;
+  }
+  #treeSvg .depth-1 text { font-size: 14px; font-weight: 700; }
+  #treeSvg .depth-2 text { font-weight: 600; }
+  #treeSvg .shape { cursor: pointer; stroke-width: 1.5px; }
+  #treeSvg .sel .shape { stroke: var(--accent); stroke-width: 3px; }
+  #treeSvg .sel text { fill: var(--accent); font-weight: 700; }
+  #treeSvg .hit text { fill: var(--accent); font-weight: 700; }
+  .dim { opacity: .13; }
+
+  @media (max-width: 860px) {
+    header, .tabs, .controls { padding-left: 16px; padding-right: 16px; }
+    main { flex-direction: column; padding: 0 16px 16px; }
+    #stage { height: 70vh; }
+    aside { width: 100%; height: auto; min-height: 0; }
+    input[type="search"] { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>藤村ゼミ 卒業研究エクスプローラー 2020–2026</h1>
+  <p id="sub"></p>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" data-view="map" aria-selected="true">類似度マップ</button>
+  <button role="tab" data-view="tree" aria-selected="false">キーワードツリー</button>
+</nav>
+
+<div class="controls">
+  <div data-for="map">
+    <div class="seg" role="group" aria-label="色分け">
+      <button data-color="group" aria-pressed="true">テーマ別</button>
+      <button data-color="year" aria-pressed="false">年度別</button>
+    </div>
+    <div class="seg" role="group" aria-label="ラベル">
+      <button data-label="short" aria-pressed="true">短縮ラベル</button>
+      <button data-label="none" aria-pressed="false">ラベルなし</button>
+    </div>
+    <div class="years" id="years"></div>
+  </div>
+  <div data-for="tree" hidden>
+    <div class="seg" role="group" aria-label="レイアウト">
+      <button data-layout="tidy" aria-pressed="true">横型ツリー</button>
+      <button data-layout="radial" aria-pressed="false">放射状ツリー</button>
+    </div>
+    <div class="key">
+      <span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#888"/></svg>大きさ＝下位の語を含めた研究数</span>
+      <span><svg width="14" height="14"><rect x="2" y="2" width="10" height="10" fill="none" stroke="#888" stroke-width="1.5"/></svg>補助的に追加した上位概念</span>
+    </div>
+  </div>
+  <input type="search" id="search" placeholder="検索">
+</div>
+
+<main>
+  <div id="stage">
+    <svg id="mapSvg"></svg>
+    <svg id="treeSvg" class="off"></svg>
+  </div>
+  <aside id="panel"></aside>
+</main>
+
+<script>
+const G = window.GRAPH, T = window.TREE;
+const NEW_YEAR = 2026;
+const WORKS = new Map(G.nodes.map(d => [d.id, d]));   // title, year, summary, label, group, neighbors
+const keywordsOf = id => T.works[id]?.keywords || [];
+const years = [...new Set(G.nodes.map(d => d.year))].sort();
+const stage = document.getElementById("stage");
+const W = () => stage.clientWidth, H = () => stage.clientHeight;
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// ---- 共有状態 ----
+let view = "map";
+let sel = null;                 // { type: "work", id } | { type: "kw", id } | null
+const searchBox = document.getElementById("search");
+const query = () => searchBox.value.trim();
+
+document.getElementById("sub").textContent =
+  `${G.nodes.length}件の卒研を、概要の意味の近さ（${G.meta.embedModel}）で並べた類似度マップと、`
+  + `キーワードの上位・下位関係で整理したキーワードツリーの2通りで探せます。太枠の点は${NEW_YEAR}年度（中間発表）です。`;
+
+// =====================================================================
+// 類似度マップ
+// =====================================================================
+const map = (() => {
+  const svg = d3.select("#mapSvg");
+  const root = svg.append("g");
+  const linkG = root.append("g").attr("class", "links");
+  const nodeG = root.append("g").attr("class", "nodes");
+  const zoom = d3.zoom().scaleExtent([0.3, 4]).on("zoom", e => root.attr("transform", e.transform));
+  svg.call(zoom).on("dblclick.zoom", null);
+  svg.on("click", e => { if (e.target === svg.node()) select(null); });
+
+  const groupColor = d3.scaleOrdinal().domain(Object.keys(G.meta.clusters).map(Number))
+    .range(["#e15759", "#4e79a7", "#59a14f", "#f28e2b", "#b07aa1", "#76b7b2", "#edc948", "#9c755f"]);
+  const yearColor = d3.scaleOrdinal().domain(years)
+    .range(["#c6dbef", "#9ecae1", "#6baed6", "#4292c6", "#2171b5", "#08519c", "#e6550d"]);
+  let colorMode = "group";
+  const activeYears = new Set(years);
+
+  const sims = G.links.map(l => l.value);
+  const dist = d3.scaleLinear().domain(d3.extent(sims)).range([110, 35]);
+
+  // t-SNE 座標を仮想キャンバスへ（縦横比は表示領域に合わせる）
+  const SPAN = 1300;
+  const aspect = Math.min(Math.max(H() / W() || 0.7, 0.5), 1.4);
+  const [x0, x1] = d3.extent(G.nodes, d => d.px), [y0, y1] = d3.extent(G.nodes, d => d.py);
+  G.nodes.forEach(d => {
+    d.tx = ((d.px - x0) / (x1 - x0) - 0.5) * SPAN;
+    d.ty = ((d.py - y0) / (y1 - y0) - 0.5) * SPAN * aspect;
+    d.x = d.tx; d.y = d.ty;
+    d.w = 20 + d.label.length * 11;  // 点＋ラベルの横幅（11px フォント想定）
+  });
+
+  const link = linkG.selectAll("line").data(G.links).join("line")
+    .attr("stroke-width", d => 0.6 + (d.value - d3.min(sims)) * 8).attr("stroke-opacity", 0.5);
+
+  const node = nodeG.selectAll("g").data(G.nodes).join("g")
+    .classed("is-new", d => d.year === NEW_YEAR)
+    .call(d3.drag()
+      .on("start", (e, d) => { if (!e.active) sim.alphaTarget(0.2).restart(); d.fx = d.x; d.fy = d.y; })
+      .on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; })
+      .on("end", (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; }))
+    .on("mouseenter", (e, d) => { if (!sel) { hover = d; apply(); } })
+    .on("mouseleave", () => { if (hover) { hover = null; apply(); } })
+    .on("click", (e, d) => { e.stopPropagation(); select({ type: "work", id: d.id }); });
+  node.append("circle").attr("r", d => d.year === NEW_YEAR ? 9.6 : 7.2);
+  const labels = node.append("text").attr("x", 12).attr("y", 4).text(d => d.label);
+  node.append("title").text(d => `${d.year}年度\n${d.title}`);
+  let hover = null;
+
+  // 点＋ラベルを長方形とみなし、重なったら押し分ける
+  function labelCollide() {
+    let nodes;
+    function force(alpha) {
+      for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i], b = nodes[j];
+        const ox = Math.min(a.x - 10 + a.w, b.x - 10 + b.w) - Math.max(a.x - 10, b.x - 10);
+        const oy = 18 - Math.abs(a.y - b.y);
+        if (ox > 0 && oy > 0) {
+          const k = 0.5 * Math.max(alpha, 0.3);
+          if (oy < ox) { const s = (a.y < b.y ? -1 : 1) * oy * k; a.y += s; b.y -= s; }
+          else { const s = (a.x < b.x ? -1 : 1) * ox * k; a.x += s; b.x -= s; }
+        }
+      }
+    }
+    force.initialize = n => { nodes = n; };
+    return force;
+  }
+
+  const sim = d3.forceSimulation(G.nodes)
+    .force("link", d3.forceLink(G.links).id(d => d.id).distance(d => dist(d.value)).strength(0.03))
+    .force("x", d3.forceX(d => d.tx).strength(0.25))
+    .force("y", d3.forceY(d => d.ty).strength(0.25))
+    .force("labels", labelCollide())
+    .on("tick", ticked);
+  function ticked() {
+    link.attr("x1", d => d.source.x).attr("y1", d => d.source.y).attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+    node.attr("transform", d => `translate(${d.x},${d.y})`);
+  }
+  sim.tick(300);
+  ticked();
+  // 初期配置が決まったら t-SNE 座標への引き戻しを弱め、ドラッグで自由に動かせるようにする
+  // （つながった研究は link の力で一緒に動く）
+  sim.force("x").strength(0.03);
+  sim.force("y").strength(0.03);
+  sim.force("link").strength(0.08);
+
+  function fit() {
+    const b = root.node().getBBox(), pad = 30;
+    const k = Math.min((W() - pad * 2) / b.width, (H() - pad * 2) / b.height, 2);
+    svg.call(zoom.transform, d3.zoomIdentity.translate(W() / 2, H() / 2).scale(k)
+      .translate(-(b.x + b.width / 2), -(b.y + b.height / 2)));
+  }
+  function focus(id) {
+    const d = WORKS.get(id);
+    if (d) svg.transition().duration(500).call(zoom.translateTo, d.x, d.y);
+  }
+
+  const neighborIds = id => {
+    const s = new Set([id]);
+    G.links.forEach(l => { if (l.source.id === id) s.add(l.target.id); if (l.target.id === id) s.add(l.source.id); });
+    return s;
+  };
+
+  function apply() {
+    const q = query().toLowerCase();
+    const match = d => !q || (d.title + d.summary + d.label).toLowerCase().includes(q);
+    // 研究選択 → つながる研究を、キーワード選択 → その語（下位の語を含む）の研究を強調
+    let focusSet = null, marked = new Set();
+    if (sel?.type === "work") { focusSet = neighborIds(sel.id); marked.add(sel.id); }
+    else if (sel?.type === "kw") { focusSet = tree.worksOf(sel.id); marked = focusSet; }
+    else if (hover) focusSet = neighborIds(hover.id);
+    const visible = d => activeYears.has(d.year) && (!focusSet || focusSet.has(d.id)) && match(d);
+    node.classed("dim", d => !visible(d))
+        .classed("sel", d => marked.has(d.id))
+        .classed("hit", d => !!q && match(d) && activeYears.has(d.year));
+    link.classed("dim", l => !(visible(l.source) && visible(l.target)) ||
+      (sel?.type === "kw") || (focusSet && !(focusSet.has(l.source.id) && focusSet.has(l.target.id))));
+  }
+
+  const colorOf = d => colorMode === "group" ? groupColor(d.group) : yearColor(d.year);
+  function paint() { node.select("circle").attr("fill", colorOf); apply(); renderPanel(); }
+
+  // コントロール
+  document.querySelectorAll("[data-color]").forEach(b => b.addEventListener("click", () => {
+    colorMode = b.dataset.color;
+    document.querySelectorAll("[data-color]").forEach(x => x.setAttribute("aria-pressed", x === b));
+    paint();
+  }));
+  document.querySelectorAll("[data-label]").forEach(b => b.addEventListener("click", () => {
+    labels.style("display", b.dataset.label === "none" ? "none" : null);
+    document.querySelectorAll("[data-label]").forEach(x => x.setAttribute("aria-pressed", x === b));
+  }));
+  const yearBox = document.getElementById("years");
+  years.forEach(y => {
+    const b = document.createElement("button");
+    b.className = "chip"; b.setAttribute("aria-pressed", "true");
+    b.innerHTML = `<i style="background:${yearColor(y)}"></i>${y}`;
+    b.addEventListener("click", () => {
+      activeYears.has(y) ? activeYears.delete(y) : activeYears.add(y);
+      b.setAttribute("aria-pressed", activeYears.has(y));
+      apply();
+    });
+    yearBox.appendChild(b);
+  });
+
+  function legendHTML() {
+    const entries = colorMode === "group"
+      ? Object.entries(G.meta.clusters).map(([k, n]) => [groupColor(+k), n, G.nodes.filter(d => d.group === +k).length])
+      : years.map(y => [yearColor(y), `${y}年度`, G.nodes.filter(d => d.year === y).length]);
+    return `<h3 style="margin-top:0">${colorMode === "group" ? "テーマ（K-meansで自動分類）" : "年度"}</h3>
+      <div class="legend">${entries.map(([c, n, k]) =>
+        `<div><i style="background:${c}"></i>${esc(n)}<small style="margin-left:auto;color:var(--muted)">${k}件</small></div>`).join("")}</div>
+      <h3>使い方</h3>
+      <p class="hint">点にマウスを重ねると、類似度の高い研究とのつながりを強調します。クリックすると概要・キーワード・似ている研究を表示します。
+      キーワードを押すと、キーワードツリーでその語を開きます。ドラッグで移動、ホイールで拡大縮小できます。</p>`;
+  }
+
+  return { fit, focus, apply, paint, legendHTML, groupColor };
+})();
+
+// =====================================================================
+// キーワードツリー
+// =====================================================================
+const tree = (() => {
+  const svg = d3.select("#treeSvg");
+  const g = svg.append("g");
+  const linkG = g.append("g").attr("class", "links");
+  const nodeG = g.append("g").attr("class", "nodes");
+  const zoom = d3.zoom().scaleExtent([0.2, 3]).on("zoom", e => g.attr("transform", e.transform));
+  svg.call(zoom).on("dblclick.zoom", null);
+  svg.on("click", e => { if (e.target === svg.node()) select(null); });
+
+  const rows = [{ name: T.root, parent: null, added: true, works: [] }, ...T.nodes];
+  const root = d3.stratify().id(d => d.name).parentId(d => d.parent)(rows);
+  // 上位の語は下位の語の研究も含む（たどって絞り込むナビゲーションのため）
+  root.eachAfter(d => {
+    d.all = new Set(d.data.works);
+    d.via = new Map();
+    (d.children || []).forEach(c => c.all.forEach(id => {
+      d.all.add(id);
+      if (!d.data.works.includes(id)) {
+        const from = c.data.works.includes(id) ? [c.id] : c.via.get(id);
+        d.via.set(id, [...new Set([...(d.via.get(id) || []), ...from])]);
+      }
+    }));
+  });
+  root.sort((a, b) => b.all.size - a.all.size || a.id.localeCompare(b.id, "ja"));
+  const byId = new Map(root.descendants().map(d => [d.id, d]));
+
+  const branchColor = d3.scaleOrdinal().domain(root.children.map(c => c.id))
+    .range(["#4e79a7", "#f28e2b", "#59a14f", "#e15759", "#b07aa1", "#76b7b2", "#9c755f", "#edc948"]);
+  const colorOf = d => d.depth === 0 ? "#888" : branchColor(d.ancestors().at(-2).id);
+  const size = d3.scaleSqrt().domain([0, d3.max(root.descendants().slice(1), d => d.all.size)]).range([2.5, 11]);
+
+  let layout = "tidy", pos = null;
+
+  function draw() {
+    let linkPath;
+    if (layout === "tidy") {
+      d3.tree().nodeSize([22, 190])(root);
+      pos = d => [d.y, d.x];
+      linkPath = d3.linkHorizontal().x(d => d.y).y(d => d.x);
+    } else {
+      d3.tree().size([2 * Math.PI, 150 * root.height])
+        .separation((a, b) => (a.parent === b.parent ? 1 : 2) / a.depth)(root);
+      pos = d => d3.pointRadial(d.x, d.y);
+      linkPath = d3.linkRadial().angle(d => d.x).radius(d => d.y);
+    }
+    linkG.selectAll("path").data(root.links()).join("path").attr("d", linkPath);
+
+    const node = nodeG.selectAll("g.n").data(root.descendants(), d => d.id).join(enter => {
+      const e = enter.append("g").attr("class", d => `n depth-${d.depth}`);
+      e.each(function (d) {
+        const s = d3.select(this);
+        if (d.data.added) {
+          s.append("rect").attr("class", "shape").attr("x", -5).attr("y", -5).attr("width", 10).attr("height", 10)
+            .attr("fill", "var(--surface)").attr("stroke", colorOf(d));
+        } else {
+          s.append("circle").attr("class", "shape").attr("r", size(d.all.size))
+            .attr("fill", colorOf(d)).attr("stroke", "var(--surface)");
+        }
+      });
+      e.append("text");
+      e.append("title").text(d => `${d.id}${d.data.added ? "（上位概念）" : ""}：${d.all.size}件`
+        + (d.via.size ? `（直接 ${d.data.works.length}件＋下位の語から ${d.via.size}件）` : ""));
+      e.on("click", (ev, d) => { ev.stopPropagation(); select({ type: "kw", id: d.id }); });
+      return e;
+    });
+    node.attr("transform", d => `translate(${pos(d)})`);
+    node.select("text").text(d => d.id).each(function (d) {
+      const t = d3.select(this).attr("dy", "0.32em");
+      if (layout === "tidy") {
+        const leaf = !d.children;
+        t.attr("transform", null).attr("x", leaf ? 12 : -12).attr("text-anchor", leaf ? "start" : "end");
+      } else if (d.depth === 0) {
+        t.attr("transform", null).attr("x", 0).attr("dy", "-1.2em").attr("text-anchor", "middle");
+      } else {
+        const deg = d.x * 180 / Math.PI - 90, flip = d.x >= Math.PI;
+        t.attr("x", flip ? -12 : 12).attr("text-anchor", flip ? "end" : "start")
+          .attr("transform", `rotate(${deg})${flip ? " rotate(180)" : ""}`);
+      }
+    });
+    fit();
+    apply();
+  }
+
+  function fit() {
+    const b = g.node().getBBox(), pad = 24;
+    // 横型ツリーは縦に長いので横幅に合わせ、上端から表示する
+    const k = layout === "tidy"
+      ? Math.min((W() - pad * 2) / b.width, 1.1)
+      : Math.min((W() - pad * 2) / b.width, (H() - pad * 2) / b.height, 1.2);
+    const tx = W() / 2 - (b.x + b.width / 2) * k;
+    const ty = layout === "tidy" && b.height * k > H() ? pad - b.y * k : H() / 2 - (b.y + b.height / 2) * k;
+    svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(k));
+  }
+
+  // 指定したノード群が画面に入るよう移動する（1つなら中央へ）
+  function focus(ids) {
+    const pts = ids.map(id => byId.get(id)).filter(Boolean).map(pos);
+    if (!pts.length) return;
+    const cx = d3.mean(pts, p => p[0]), cy = d3.mean(pts, p => p[1]);
+    svg.transition().duration(500).call(zoom.translateTo, cx, cy);
+  }
+
+  function apply() {
+    const q = query();
+    let onPath = null, marked = new Set();
+    if (sel?.type === "kw" && byId.has(sel.id)) {
+      const d = byId.get(sel.id);
+      onPath = new Set([...d.ancestors(), ...d.descendants()].map(n => n.id));
+      marked.add(d.id);
+    } else if (sel?.type === "work") {
+      const kws = keywordsOf(sel.id).map(k => byId.get(k)).filter(Boolean);
+      onPath = new Set(kws.flatMap(k => k.ancestors()).map(n => n.id));
+      kws.forEach(k => marked.add(k.id));
+    }
+    nodeG.selectAll("g.n")
+      .classed("sel", d => marked.has(d.id))
+      .classed("hit", d => !!q && d.id.includes(q))
+      .classed("dim", d => onPath && !onPath.has(d.id));
+    linkG.selectAll("path").classed("dim", l => onPath && !(onPath.has(l.source.id) && onPath.has(l.target.id)));
+  }
+
+  const worksOf = id => byId.get(id)?.all || new Set();
+
+  document.querySelectorAll("[data-layout]").forEach(b => b.addEventListener("click", () => {
+    layout = b.dataset.layout;
+    document.querySelectorAll("[data-layout]").forEach(x => x.setAttribute("aria-pressed", x === b));
+    draw();
+  }));
+
+  return { draw, fit, focus, apply, worksOf, byId, root, branchColor };
+})();
+
+// =====================================================================
+// 選択・表示の切り替え・パネル
+// =====================================================================
+function select(s, { focus = false } = {}) {
+  sel = s;
+  map.apply();
+  tree.apply();
+  renderPanel();
+  if (focus && s) focusCurrent();
+  writeHash();
+}
+
+function focusCurrent() {
+  if (!sel) return;
+  if (view === "map") {
+    if (sel.type === "work") map.focus(sel.id);
+  } else {
+    tree.focus(sel.type === "kw" ? [sel.id] : keywordsOf(sel.id));
+  }
+}
+
+function setView(v, { focus = true } = {}) {
+  view = v;
+  document.querySelectorAll("[data-view]").forEach(b => b.setAttribute("aria-selected", b.dataset.view === v));
+  document.querySelectorAll("[data-for]").forEach(el => { el.hidden = el.dataset.for !== v; });
+  document.getElementById("mapSvg").classList.toggle("off", v !== "map");
+  document.getElementById("treeSvg").classList.toggle("off", v !== "tree");
+  searchBox.placeholder = v === "map" ? "タイトル・概要を検索" : "キーワードを検索";
+  renderPanel();
+  if (focus) focusCurrent();
+  writeHash();
+}
+
+// 他方の表示へ移動して、同じ研究／キーワードを表示する
+function openIn(v, s) { sel = s; map.apply(); tree.apply(); setView(v); }
+
+const panel = document.getElementById("panel");
+const workItem = (id, note = "") => {
+  const w = WORKS.get(id);
+  return `<li><button class="work" data-work="${id}">${esc(w.title)}</button><br><small>${w.year}年度${note}</small></li>`;
+};
+
+function renderPanel() {
+  if (sel?.type === "work") panel.innerHTML = workPanel(sel.id);
+  else if (sel?.type === "kw") panel.innerHTML = keywordPanel(sel.id);
+  else panel.innerHTML = view === "map" ? map.legendHTML() : treeOverview();
+
+  panel.querySelectorAll("[data-work]").forEach(b =>
+    b.addEventListener("click", () => select({ type: "work", id: b.dataset.work }, { focus: true })));
+  panel.querySelectorAll("[data-kw]").forEach(b =>
+    b.addEventListener("click", () => {
+      // 類似度マップ上のキーワードはツリーで開く。ツリー上ではそのまま選択を移す
+      const s = { type: "kw", id: b.dataset.kw };
+      view === "tree" ? select(s, { focus: true }) : openIn("tree", s);
+    }));
+  panel.querySelectorAll("[data-open]").forEach(b =>
+    b.addEventListener("click", () => openIn(b.dataset.open, sel)));
+}
+
+function workPanel(id) {
+  const w = WORKS.get(id);
+  const kws = keywordsOf(id);
+  return `
+    <div class="crumb"><span>${w.year}年度${w.year === NEW_YEAR ? "（中間発表）" : ""}</span>
+      <span class="tag"><i style="background:${map.groupColor(w.group)}"></i>${esc(G.meta.clusters[w.group])}</span></div>
+    <h2>${esc(w.title)}</h2>
+    <p class="summary">${esc(w.summary)}</p>
+    <h3>キーワード${view === "map" ? "（押すとキーワードツリーで開きます）" : "（ツリー上で強調表示）"}</h3>
+    <div class="chips">${kws.map(k => `<button data-kw="${esc(k)}">${esc(k)}</button>`).join("")}</div>
+    <div class="actions">
+      ${view === "tree" ? `<button data-open="map">類似度マップでこの研究を見る</button>`
+                        : `<button data-open="tree">キーワードツリーでこの研究を見る</button>`}
+    </div>
+    <h3>似ている研究（コサイン類似度）</h3>
+    <ul>${w.neighbors.map(n => {
+      const m = WORKS.get(n.id);
+      return `<li class="sim-row"><span><button class="work" data-work="${m.id}">${esc(m.title)}</button><br>
+        <small>${m.year}年度</small></span><small>${n.sim.toFixed(3)}</small></li>`;
+    }).join("")}</ul>`;
+}
+
+function keywordPanel(name) {
+  const d = tree.byId.get(name);
+  if (!d) return `<p class="hint">「${esc(name)}」はツリーにありません。</p>`;
+  const byYear = (a, b) => WORKS.get(b).year - WORKS.get(a).year || a.localeCompare(b);
+  const direct = d.data.works.slice().sort(byYear);
+  const inherited = [...d.via.keys()].sort(byYear);
+  return `
+    <div class="crumb">${d.ancestors().reverse().map(a => esc(a.id)).join(" › ")}</div>
+    <h2>${esc(d.id)}</h2>
+    <div class="meta">関連する研究 ${d.all.size}件（直接 ${direct.length}件 ／ 下位の語から ${inherited.length}件）
+      ${d.data.added ? "<br>補助的に追加した上位概念" : ""}
+      ${d.data.promotedFrom ? `<br>「${esc(d.data.promotedFrom)}」の下から1つ上の層へ移した語` : ""}</div>
+    <div class="actions">
+      ${view === "tree" ? `<button data-open="map">類似度マップでこの語の研究を見る</button>`
+                        : `<button data-open="tree">キーワードツリーでこの語を見る</button>`}
+    </div>
+    ${d.children ? `<h3>下位の語で絞り込む</h3><div class="chips">${d.children.map(c =>
+      `<button data-kw="${esc(c.id)}">${esc(c.id)}（${c.all.size}）</button>`).join("")}</div>` : ""}
+    ${direct.length ? `<h3>この語が直接付いた研究（${direct.length}件）</h3><ul>${direct.map(id => workItem(id)).join("")}</ul>` : ""}
+    ${inherited.length ? `<h3>下位の語から含まれる研究（${inherited.length}件）</h3><ul>${inherited.map(id =>
+      workItem(id, ` ／ 経由：${d.via.get(id).map(esc).join("・")}`)).join("")}</ul>` : ""}`;
+}
+
+function treeOverview() {
+  const tops = tree.root.children.map(c => `<li><span style="color:${tree.branchColor(c.id)}">■</span>
+    <button class="work" data-kw="${esc(c.id)}">${esc(c.id)}</button>
+    <small>— キーワード ${c.descendants().length - 1}語 / 研究 ${c.all.size}件</small></li>`).join("");
+  const kwCount = T.nodes.filter(d => !d.added).length;
+  const single = T.nodes.filter(d => !d.added && d.works.length === 1).length;
+  const ys = [...years].reverse();
+  return `
+    <h3 style="margin-top:0">大分類</h3><ul>${tops}</ul>
+    <h3>語彙の内訳</h3>
+    <p class="stats">キーワード ${kwCount}語（うち1件の研究にしか付いていない語 ${single}語）<br>
+    補助的に追加した上位概念 ${T.nodes.filter(d => d.added).length}個 ／ 1つ上の層へ移した語 ${T.nodes.filter(d => d.promotedFrom).length}語</p>
+    <h3>研究一覧（${G.nodes.length}件）</h3>
+    ${ys.map(y => {
+      const list = G.nodes.filter(d => d.year === y).map(d => d.id);
+      return `<details${y === ys[0] ? " open" : ""}><summary>${y}年度（${list.length}件）</summary>
+        <ul>${list.map(id => workItem(id)).join("")}</ul></details>`;
+    }).join("")}
+    <h3>使い方</h3>
+    <p class="hint">キーワードをクリックすると、その語の上位・下位の枝を強調し、下位の語を含めた関連研究を表示します。
+    研究を選ぶと、その研究のキーワードをツリー上で強調し、類似度マップへのリンクを表示します。</p>`;
+}
+
+// ---- URL（#map, #tree&work=ID, #tree&kw=語 など）で状態を共有 ----
+function writeHash() {
+  const p = [view];
+  if (sel) p.push(`${sel.type}=${encodeURIComponent(sel.id)}`);
+  history.replaceState(null, "", "#" + p.join("&"));
+}
+function readHash() {
+  const [v, s] = location.hash.slice(1).split("&");
+  const out = { view: v === "tree" ? "tree" : "map", sel: null };
+  if (s) {
+    const [type, id] = s.split("=");
+    if ((type === "work" && WORKS.has(decodeURIComponent(id))) || type === "kw")
+      out.sel = { type, id: decodeURIComponent(id) };
+  }
+  return out;
+}
+
+// ---- 初期化 ----
+document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click", () => setView(b.dataset.view)));
+searchBox.addEventListener("input", () => { map.apply(); tree.apply(); });
+window.addEventListener("resize", () => { map.fit(); tree.fit(); });
+
+map.fit();
+tree.draw();
+map.paint();
+const init = readHash();
+sel = init.sel;
+map.apply(); tree.apply();
+setView(init.view);
+</script>
+</body>
+</html>

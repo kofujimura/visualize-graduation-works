@@ -1,0 +1,649 @@
+{
+  "nodes": [
+    {
+      "name": "AI・データサイエンス",
+      "parent": "卒業研究",
+      "added": true
+    },
+    {
+      "name": "Web・アプリケーション開発",
+      "parent": "卒業研究",
+      "added": true
+    },
+    {
+      "name": "IoT・センシング",
+      "parent": "卒業研究",
+      "added": true
+    },
+    {
+      "name": "メディア表現・インタラクション",
+      "parent": "卒業研究",
+      "added": true
+    },
+    {
+      "name": "ブロックチェーン・分散技術",
+      "parent": "卒業研究",
+      "added": true
+    },
+    {
+      "name": "支援領域・サービス",
+      "parent": "卒業研究",
+      "added": true
+    },
+    {
+      "name": "コミュニケーション・コミュニティ",
+      "parent": "卒業研究",
+      "added": true
+    },
+    {
+      "name": "機械学習",
+      "parent": "AI・データサイエンス",
+      "added": false
+    },
+    {
+      "name": "生成AI",
+      "parent": "AI・データサイエンス",
+      "added": false
+    },
+    {
+      "name": "データ分析",
+      "parent": "AI・データサイエンス",
+      "added": false
+    },
+    {
+      "name": "数理最適化",
+      "parent": "AI・データサイエンス",
+      "added": false
+    },
+    {
+      "name": "画像認識",
+      "parent": "機械学習",
+      "added": false
+    },
+    {
+      "name": "音声認識",
+      "parent": "機械学習",
+      "added": false
+    },
+    {
+      "name": "環境音認識",
+      "parent": "機械学習",
+      "added": false
+    },
+    {
+      "name": "推薦システム",
+      "parent": "機械学習",
+      "added": false
+    },
+    {
+      "name": "深層学習",
+      "parent": "機械学習",
+      "added": false
+    },
+    {
+      "name": "転移学習",
+      "parent": "機械学習",
+      "added": false
+    },
+    {
+      "name": "行動認識",
+      "parent": "機械学習",
+      "added": false
+    },
+    {
+      "name": "疲労推定",
+      "parent": "機械学習",
+      "added": false
+    },
+    {
+      "name": "エッジAI",
+      "parent": "機械学習",
+      "added": false
+    },
+    {
+      "name": "物体認識",
+      "parent": "画像認識",
+      "added": false
+    },
+    {
+      "name": "物体検出",
+      "parent": "画像認識",
+      "added": false
+    },
+    {
+      "name": "姿勢推定",
+      "parent": "画像認識",
+      "added": false
+    },
+    {
+      "name": "OCR",
+      "parent": "画像認識",
+      "added": false
+    },
+    {
+      "name": "OpenCV",
+      "parent": "画像認識",
+      "added": false
+    },
+    {
+      "name": "CLIP",
+      "parent": "画像認識",
+      "added": false
+    },
+    {
+      "name": "表情認識",
+      "parent": "画像認識",
+      "added": false
+    },
+    {
+      "name": "YOLO",
+      "parent": "物体検出",
+      "added": false
+    },
+    {
+      "name": "PoseNet",
+      "parent": "姿勢推定",
+      "added": false
+    },
+    {
+      "name": "MediaPipe",
+      "parent": "姿勢推定",
+      "added": false
+    },
+    {
+      "name": "ハンドトラッキング",
+      "parent": "姿勢推定",
+      "added": false
+    },
+    {
+      "name": "ジェスチャ認識",
+      "parent": "姿勢推定",
+      "added": false
+    },
+    {
+      "name": "動作分析",
+      "parent": "行動認識",
+      "added": false
+    },
+    {
+      "name": "LSTM",
+      "parent": "深層学習",
+      "added": false
+    },
+    {
+      "name": "嗜好推定",
+      "parent": "推薦システム",
+      "added": false
+    },
+    {
+      "name": "LLM",
+      "parent": "生成AI",
+      "added": false
+    },
+    {
+      "name": "画像生成AI",
+      "parent": "生成AI",
+      "added": false
+    },
+    {
+      "name": "プロンプト設計",
+      "parent": "生成AI",
+      "added": false
+    },
+    {
+      "name": "ハルシネーション抑制",
+      "parent": "LLM",
+      "added": false
+    },
+    {
+      "name": "AIエージェント",
+      "parent": "LLM",
+      "added": false
+    },
+    {
+      "name": "人格再現",
+      "parent": "LLM",
+      "added": false
+    },
+    {
+      "name": "マルチエージェント",
+      "parent": "AIエージェント",
+      "added": false
+    },
+    {
+      "name": "長期記憶",
+      "parent": "AIエージェント",
+      "added": false
+    },
+    {
+      "name": "能動的支援",
+      "parent": "AIエージェント",
+      "added": false
+    },
+    {
+      "name": "先回り支援",
+      "parent": "AIエージェント",
+      "added": false
+    },
+    {
+      "name": "キャラクター生成",
+      "parent": "画像生成AI",
+      "added": false
+    },
+    {
+      "name": "漫画生成",
+      "parent": "画像生成AI",
+      "added": false
+    },
+    {
+      "name": "データ可視化",
+      "parent": "データ分析",
+      "added": false
+    },
+    {
+      "name": "時系列予測",
+      "parent": "データ分析",
+      "added": false
+    },
+    {
+      "name": "会話ログ分析",
+      "parent": "データ分析",
+      "added": false
+    },
+    {
+      "name": "感情分析",
+      "parent": "データ分析",
+      "added": false
+    },
+    {
+      "name": "音声分析",
+      "parent": "データ分析",
+      "added": false
+    },
+    {
+      "name": "歌詞解析",
+      "parent": "データ分析",
+      "added": false
+    },
+    {
+      "name": "時系列可視化",
+      "parent": "データ可視化",
+      "added": false
+    },
+    {
+      "name": "3D可視化",
+      "parent": "データ可視化",
+      "added": false
+    },
+    {
+      "name": "three.js",
+      "parent": "3D可視化",
+      "added": false
+    },
+    {
+      "name": "3Dアバター",
+      "parent": "3D可視化",
+      "added": false
+    },
+    {
+      "name": "Webアプリ",
+      "parent": "Web・アプリケーション開発",
+      "added": false
+    },
+    {
+      "name": "API連携",
+      "parent": "Web・アプリケーション開発",
+      "added": false
+    },
+    {
+      "name": "LINE Bot",
+      "parent": "Webアプリ",
+      "added": false
+    },
+    {
+      "name": "React",
+      "parent": "Webアプリ",
+      "added": false
+    },
+    {
+      "name": "Socket.IO",
+      "parent": "Webアプリ",
+      "added": false
+    },
+    {
+      "name": "通知システム",
+      "parent": "Webアプリ",
+      "added": false
+    },
+    {
+      "name": "ビデオチャット",
+      "parent": "Webアプリ",
+      "added": false
+    },
+    {
+      "name": "Googleスプレッドシート",
+      "parent": "API連携",
+      "added": false
+    },
+    {
+      "name": "Google Apps Script",
+      "parent": "API連携",
+      "added": false
+    },
+    {
+      "name": "カレンダー連携",
+      "parent": "API連携",
+      "added": false
+    },
+    {
+      "name": "OpenAI API",
+      "parent": "API連携",
+      "added": false
+    },
+    {
+      "name": "IoT",
+      "parent": "IoT・センシング",
+      "added": false
+    },
+    {
+      "name": "センサー",
+      "parent": "IoT・センシング",
+      "added": false
+    },
+    {
+      "name": "obniz",
+      "parent": "IoT",
+      "added": false
+    },
+    {
+      "name": "micro:bit",
+      "parent": "IoT",
+      "added": false
+    },
+    {
+      "name": "BLE",
+      "parent": "IoT",
+      "added": false
+    },
+    {
+      "name": "NFC",
+      "parent": "IoT",
+      "added": false
+    },
+    {
+      "name": "IoTセンサ",
+      "parent": "センサー",
+      "added": false
+    },
+    {
+      "name": "Webカメラ",
+      "parent": "センサー",
+      "added": false
+    },
+    {
+      "name": "悪臭検知",
+      "parent": "センサー",
+      "added": false
+    },
+    {
+      "name": "インタラクティブメディア",
+      "parent": "メディア表現・インタラクション",
+      "added": false
+    },
+    {
+      "name": "音楽",
+      "parent": "メディア表現・インタラクション",
+      "added": false
+    },
+    {
+      "name": "色彩科学",
+      "parent": "メディア表現・インタラクション",
+      "added": false
+    },
+    {
+      "name": "アルゴリズムデザイン",
+      "parent": "メディア表現・インタラクション",
+      "added": false
+    },
+    {
+      "name": "読書体験",
+      "parent": "メディア表現・インタラクション",
+      "added": false
+    },
+    {
+      "name": "p5.js",
+      "parent": "インタラクティブメディア",
+      "added": false
+    },
+    {
+      "name": "3Dインターフェース",
+      "parent": "インタラクティブメディア",
+      "added": false
+    },
+    {
+      "name": "光表現",
+      "parent": "インタラクティブメディア",
+      "added": false
+    },
+    {
+      "name": "インスタレーション",
+      "parent": "インタラクティブメディア",
+      "added": false
+    },
+    {
+      "name": "サイネージ",
+      "parent": "インタラクティブメディア",
+      "added": false
+    },
+    {
+      "name": "非接触操作",
+      "parent": "インタラクティブメディア",
+      "added": false
+    },
+    {
+      "name": "VR",
+      "parent": "3Dインターフェース",
+      "added": false
+    },
+    {
+      "name": "AR",
+      "parent": "3Dインターフェース",
+      "added": false
+    },
+    {
+      "name": "配色支援",
+      "parent": "色彩科学",
+      "added": false
+    },
+    {
+      "name": "パターン生成",
+      "parent": "アルゴリズムデザイン",
+      "added": false
+    },
+    {
+      "name": "ブロックチェーン",
+      "parent": "ブロックチェーン・分散技術",
+      "added": false
+    },
+    {
+      "name": "分散ファイルシステム",
+      "parent": "ブロックチェーン・分散技術",
+      "added": false
+    },
+    {
+      "name": "暗号化",
+      "parent": "ブロックチェーン・分散技術",
+      "added": false
+    },
+    {
+      "name": "NFT",
+      "parent": "ブロックチェーン",
+      "added": false
+    },
+    {
+      "name": "スマートコントラクト",
+      "parent": "ブロックチェーン",
+      "added": false
+    },
+    {
+      "name": "MetaMask",
+      "parent": "ブロックチェーン",
+      "added": false
+    },
+    {
+      "name": "暗号資産",
+      "parent": "ブロックチェーン",
+      "added": false
+    },
+    {
+      "name": "データ公証",
+      "parent": "ブロックチェーン",
+      "added": false
+    },
+    {
+      "name": "分散型ID",
+      "parent": "ブロックチェーン",
+      "added": false
+    },
+    {
+      "name": "所有権証明",
+      "parent": "NFT",
+      "added": false
+    },
+    {
+      "name": "真贋判定",
+      "parent": "NFT",
+      "added": false
+    },
+    {
+      "name": "C2PA",
+      "parent": "真贋判定",
+      "added": false
+    },
+    {
+      "name": "JPYC",
+      "parent": "暗号資産",
+      "added": false
+    },
+    {
+      "name": "失効レジストリ",
+      "parent": "分散型ID",
+      "added": false
+    },
+    {
+      "name": "IPFS",
+      "parent": "分散ファイルシステム",
+      "added": false
+    },
+    {
+      "name": "生活支援",
+      "parent": "支援領域・サービス",
+      "added": false
+    },
+    {
+      "name": "学習支援",
+      "parent": "支援領域・サービス",
+      "added": false
+    },
+    {
+      "name": "農業支援",
+      "parent": "支援領域・サービス",
+      "added": false
+    },
+    {
+      "name": "スポーツ支援",
+      "parent": "支援領域・サービス",
+      "added": false
+    },
+    {
+      "name": "飲食店",
+      "parent": "支援領域・サービス",
+      "added": false
+    },
+    {
+      "name": "バリアフリー",
+      "parent": "生活支援",
+      "added": false
+    },
+    {
+      "name": "時間管理",
+      "parent": "生活支援",
+      "added": false
+    },
+    {
+      "name": "食品管理",
+      "parent": "生活支援",
+      "added": false
+    },
+    {
+      "name": "自己受容",
+      "parent": "生活支援",
+      "added": false
+    },
+    {
+      "name": "推し活",
+      "parent": "生活支援",
+      "added": false
+    },
+    {
+      "name": "スケジュール管理",
+      "parent": "時間管理",
+      "added": false
+    },
+    {
+      "name": "食品ロス",
+      "parent": "食品管理",
+      "added": false
+    },
+    {
+      "name": "食材置換",
+      "parent": "食品管理",
+      "added": false
+    },
+    {
+      "name": "eラーニング",
+      "parent": "学習支援",
+      "added": false
+    },
+    {
+      "name": "LMS",
+      "parent": "学習支援",
+      "added": false
+    },
+    {
+      "name": "自己調整学習",
+      "parent": "学習支援",
+      "added": false
+    },
+    {
+      "name": "方言継承",
+      "parent": "学習支援",
+      "added": false
+    },
+    {
+      "name": "コミュニケーション支援",
+      "parent": "コミュニケーション・コミュニティ",
+      "added": false
+    },
+    {
+      "name": "情報共有",
+      "parent": "コミュニケーション・コミュニティ",
+      "added": false
+    },
+    {
+      "name": "コミュニティ形成",
+      "parent": "コミュニケーション・コミュニティ",
+      "added": false
+    },
+    {
+      "name": "Discord",
+      "parent": "コミュニティ形成",
+      "added": false
+    },
+    {
+      "name": "仲裁支援",
+      "parent": "コミュニケーション支援",
+      "added": false
+    }
+  ]
+}
